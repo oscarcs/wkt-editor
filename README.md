@@ -1,6 +1,6 @@
 # WKT Editor
 
-A browser-based editor for creating and editing [Well-Known Text (WKT)](https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry) geometry. Draw shapes on an interactive canvas and get live WKT output, or paste WKT to visualize it on the map.
+A browser-based editor for creating and editing [Well-Known Text (WKT)](https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry) geometry. Draw shapes on an interactive canvas and get live WKT output, or paste WKT to visualize it on the grid.
 
 ## Features
 
