@@ -154,7 +154,7 @@ export default function WktEditor({ value, onChange, onPaste, onCenter, error, r
               onPaste(pasted);
             }
           }}
-          placeholder={"Draw shapes on the map, or paste WKT here...\n\nSupported types:\n  POINT (x y)\n  LINESTRING (x y, x y, ...)\n  MULTILINESTRING ((x y, x y, ...), ...)\n  POLYGON ((x y, x y, ...))"}
+          placeholder={"Draw shapes on the map, or paste WKT here...\n\nSupported types:\n  POINT (x y)\n  MULTIPOINT ((x y), (x y), ...)\n  LINESTRING (x y, x y, ...)\n  MULTILINESTRING ((x y, x y, ...), ...)\n  POLYGON ((x y, x y, ...))\n  MULTIPOLYGON (((x y, ...)), ...)\n  GEOMETRYCOLLECTION (...)"}
           spellCheck={false}
           className={`absolute inset-0 w-full h-full ${EDITOR_CLASSES} resize-none focus:outline-none bg-transparent caret-gray-900 placeholder-gray-400 border-0`}
           style={{ color: 'transparent' }}

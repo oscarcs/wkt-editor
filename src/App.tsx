@@ -60,7 +60,7 @@ function App() {
     try {
       const { layers, ranges } = parseMultiWkt(newWkt);
       if (layers.length === 0 && newWkt.trim()) {
-        setError('Could not parse WKT. Supported: POINT, LINESTRING, MULTILINESTRING, POLYGON');
+        setError('Could not parse WKT. Supported: POINT, MULTIPOINT, LINESTRING, MULTILINESTRING, POLYGON, MULTIPOLYGON, GEOMETRYCOLLECTION');
         return false;
       } else {
         setError(null);

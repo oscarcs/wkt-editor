@@ -58,6 +58,7 @@ function parseCoord(s: string): L.LatLng {
   const parts = s.trim().split(/\s+/);
   const lng = parseFloat(parts[0]);
   const lat = parseFloat(parts[1]);
+  // Z/M ordinates silently ignored (2D canvas)
   return L.latLng(lat, lng);
 }
 
@@ -88,9 +89,44 @@ function parseRings(s: string): L.LatLng[][] {
   return rings;
 }
 
-export function parseWkt(wkt: string): L.Layer | null {
+/** Parse top-level paren groups, each of which itself contains paren groups (for MULTIPOLYGON) */
+function parsePolygonGroups(s: string): L.LatLng[][][] {
+  const groups: L.LatLng[][][] = [];
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '(') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (s[i] === ')') {
+      depth--;
+      if (depth === 0) {
+        // Each group is a polygon's ring set: ((ring1), (ring2), ...)
+        const inner = s.slice(start + 1, i);
+        groups.push(parseRings(inner));
+      }
+    }
+  }
+  return groups;
+}
+
+/** Parse MULTIPOINT which supports both `MULTIPOINT (x y, x y)` and `MULTIPOINT ((x y), (x y))` */
+function parseMultiPointCoords(s: string): L.LatLng[] {
+  // Check if it uses the parenthesized form
+  if (s.includes('(')) {
+    return parseRings(s).map(ring => ring[0]);
+  }
+  return parseCoordList(s);
+}
+
+export function parseWkt(wkt: string): L.Layer | L.Layer[] | null {
   const trimmed = wkt.trim();
-  const match = trimmed.match(/^(\w+)\s*\((.+)\)$/s);
+
+  // Handle EMPTY geometries
+  if (/^\w+\s+EMPTY$/i.test(trimmed)) return null;
+
+  // Strip optional Z/M/ZM qualifier: "POINT Z (...)" -> "POINT (...)"
+  const match = trimmed.match(/^(\w+)(?:\s+[ZM]{1,2})?\s*\((.+)\)$/si);
   if (!match) return null;
 
   const type = match[1].toUpperCase();
@@ -105,6 +141,10 @@ export function parseWkt(wkt: string): L.Layer | null {
       const coords = parseCoordList(body);
       return L.polyline(coords);
     }
+    case 'MULTIPOINT': {
+      const coords = parseMultiPointCoords(body);
+      return coords.map(c => L.marker(c));
+    }
     case 'MULTILINESTRING': {
       const lines = parseRings(body);
       return L.polyline(lines);
@@ -112,6 +152,37 @@ export function parseWkt(wkt: string): L.Layer | null {
     case 'POLYGON': {
       const rings = parseRings(body);
       return L.polygon(rings);
+    }
+    case 'MULTIPOLYGON': {
+      const polygonGroups = parsePolygonGroups(body);
+      return polygonGroups.map(rings => L.polygon(rings));
+    }
+    case 'GEOMETRYCOLLECTION': {
+      // Recursively parse each geometry in the collection
+      const sublayers: L.Layer[] = [];
+      const regex = /\b(\w+)\s*\(/g;
+      let m;
+      while ((m = regex.exec(body)) !== null) {
+        const start = m.index;
+        let depth = 0;
+        let i = m.index + m[0].length - 1;
+        for (; i < body.length; i++) {
+          if (body[i] === '(') depth++;
+          else if (body[i] === ')') {
+            depth--;
+            if (depth === 0) break;
+          }
+        }
+        if (depth !== 0) continue;
+        const subWkt = body.slice(start, i + 1);
+        const result = parseWkt(subWkt);
+        if (result) {
+          if (Array.isArray(result)) sublayers.push(...result);
+          else sublayers.push(result);
+        }
+        regex.lastIndex = i + 1;
+      }
+      return sublayers;
     }
     default:
       return null;
@@ -148,10 +219,17 @@ export function parseMultiWkt(text: string): ParseMultiWktResult {
     }
     if (depth !== 0) continue; // unmatched parens, skip
     const wktStr = text.slice(start, i + 1);
-    const layer = parseWkt(wktStr);
-    if (layer) {
-      layers.push(layer);
-      ranges.push({ start, end: i + 1 });
+    const result = parseWkt(wktStr);
+    if (result) {
+      if (Array.isArray(result)) {
+        for (const l of result) {
+          layers.push(l);
+          ranges.push({ start, end: i + 1 });
+        }
+      } else {
+        layers.push(result);
+        ranges.push({ start, end: i + 1 });
+      }
     }
     regex.lastIndex = i + 1;
   }
