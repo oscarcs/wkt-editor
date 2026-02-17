@@ -5,8 +5,8 @@ A browser-based editor for creating and editing [Well-Known Text (WKT)](https://
 ## Features
 
 - **Draw geometries** — Point, LineString, and Polygon via Leaflet.draw toolbar
-- **Bidirectional editing** — draw shapes to generate WKT, or paste/edit WKT to render on the map
-- **Graph paper canvas** — clean grid background with adaptive spacing (no map tiles)
+- **Bidirectional editing** — draw shapes to generate WKT, or paste/edit WKT to render on the grid
+- **Graph paper canvas** — clean grid background with adaptive spacing
 - **Quantize** — round all coordinates to 2 decimal places with one click
 - **Keyboard shortcuts** — press Enter to finish drawing or save edits
 - **Persistent state** — geometry is saved to localStorage and restored on reload
@@ -36,8 +36,6 @@ Output goes to `dist/`.
    - **Build command:** `npm run build`
    - **Build output directory:** `dist`
 4. Deploy
-
-No server-side code — it's a fully static SPA.
 
 ## Tech Stack
 
