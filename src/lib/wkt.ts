@@ -33,8 +33,15 @@ export function layerToWkt(layer: L.Layer): string | null {
   }
 
   if (layer instanceof L.Polyline) {
-    const latlngs = layer.getLatLngs() as L.LatLng[];
-    const coords = latlngs.map(coordToWkt).join(', ');
+    const latlngs = layer.getLatLngs();
+    // Multi-linestring: getLatLngs() returns LatLng[][] when it has multiple lines
+    if (Array.isArray(latlngs[0]) && !(latlngs[0] instanceof L.LatLng)) {
+      const lines = (latlngs as L.LatLng[][]).map(
+        line => `(${line.map(coordToWkt).join(', ')})`
+      );
+      return `MULTILINESTRING (${lines.join(', ')})`;
+    }
+    const coords = (latlngs as L.LatLng[]).map(coordToWkt).join(', ');
     return `LINESTRING (${coords})`;
   }
 
@@ -98,6 +105,10 @@ export function parseWkt(wkt: string): L.Layer | null {
       const coords = parseCoordList(body);
       return L.polyline(coords);
     }
+    case 'MULTILINESTRING': {
+      const lines = parseRings(body);
+      return L.polyline(lines);
+    }
     case 'POLYGON': {
       const rings = parseRings(body);
       return L.polygon(rings);
@@ -109,11 +120,26 @@ export function parseWkt(wkt: string): L.Layer | null {
 
 export function parseMultiWkt(text: string): L.Layer[] {
   const layers: L.Layer[] = [];
-  // Split on newlines, each line is a separate WKT geometry
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  for (const line of lines) {
-    const layer = parseWkt(line);
+  // Match each top-level WKT statement: TYPE (...) allowing multiline content
+  const regex = /\b(\w+)\s*\(/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const start = match.index;
+    // Find the matching closing paren by tracking depth
+    let depth = 0;
+    let i = match.index + match[0].length - 1; // position of opening '('
+    for (; i < text.length; i++) {
+      if (text[i] === '(') depth++;
+      else if (text[i] === ')') {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    if (depth !== 0) continue; // unmatched parens, skip
+    const wktStr = text.slice(start, i + 1);
+    const layer = parseWkt(wktStr);
     if (layer) layers.push(layer);
+    regex.lastIndex = i + 1;
   }
   return layers;
 }

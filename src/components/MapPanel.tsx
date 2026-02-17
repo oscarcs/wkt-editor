@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import L from 'leaflet';
 import 'leaflet-draw';
 import { layerToWkt } from '../lib/wkt';
@@ -17,14 +17,30 @@ L.Icon.Default.mergeOptions({
 
 interface MapPanelProps {
   onLayersChange: (wkt: string) => void;
-  externalLayers: L.Layer[] | null; // layers parsed from WKT text input
+  externalLayers: L.Layer[] | null;
 }
 
-export default function MapPanel({ onLayersChange, externalLayers }: MapPanelProps) {
+export interface MapPanelHandle {
+  centerOnLayers: () => void;
+}
+
+export default forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ onLayersChange, externalLayers }, ref) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const drawnItemsRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
   const isExternalUpdateRef = useRef(false);
+
+  const centerOnLayers = useCallback(() => {
+    const map = mapRef.current;
+    const drawnItems = drawnItemsRef.current;
+    if (!map) return;
+    const bounds = drawnItems.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+    }
+  }, []);
+
+  useImperativeHandle(ref, () => ({ centerOnLayers }), [centerOnLayers]);
 
   const syncWkt = useCallback(() => {
     if (isExternalUpdateRef.current) return;
@@ -209,14 +225,6 @@ export default function MapPanel({ onLayersChange, externalLayers }: MapPanelPro
       drawnItems.addLayer(layer);
     }
 
-    // Fit bounds if there are layers
-    if (externalLayers.length > 0) {
-      const bounds = drawnItems.getBounds();
-      if (bounds.isValid()) {
-        mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-      }
-    }
-
     // Reset flag after a tick so future draw events fire normally
     requestAnimationFrame(() => {
       isExternalUpdateRef.current = false;
@@ -226,4 +234,4 @@ export default function MapPanel({ onLayersChange, externalLayers }: MapPanelPro
   return (
     <div ref={mapContainerRef} className="h-full w-full" />
   );
-}
+});

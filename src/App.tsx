@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import L from 'leaflet';
 import MapPanel from './components/MapPanel';
+import type { MapPanelHandle } from './components/MapPanel';
 import WktEditor from './components/WktEditor';
 import { parseMultiWkt } from './lib/wkt';
 
@@ -23,6 +24,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [externalLayers, setExternalLayers] = useState<L.Layer[] | null>(initial.current.layers);
   const isMapUpdateRef = useRef(false);
+  const mapRef = useRef<MapPanelHandle>(null);
 
   // Persist WKT to localStorage whenever it changes
   useEffect(() => {
@@ -39,27 +41,50 @@ function App() {
     });
   }, []);
 
-  // Called when text editor changes
-  const handleTextChange = useCallback((newWkt: string) => {
+  // Parse WKT and update layers, returns true if valid
+  const applyWkt = useCallback((newWkt: string): boolean => {
     setWkt(newWkt);
 
     if (!newWkt.trim()) {
       setError(null);
       setExternalLayers([]);
-      return;
+      return true;
     }
 
     try {
       const layers = parseMultiWkt(newWkt);
       if (layers.length === 0 && newWkt.trim()) {
-        setError('Could not parse WKT. Supported: POINT, LINESTRING, POLYGON');
+        setError('Could not parse WKT. Supported: POINT, LINESTRING, MULTILINESTRING, POLYGON');
+        return false;
       } else {
         setError(null);
       }
       setExternalLayers(layers);
+      return layers.length > 0;
     } catch (e) {
       setError(`Parse error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      return false;
     }
+  }, []);
+
+  // Called when text editor changes
+  const handleTextChange = useCallback((newWkt: string) => {
+    applyWkt(newWkt);
+  }, [applyWkt]);
+
+  // Called on paste — apply WKT then center
+  const handlePaste = useCallback((pasted: string) => {
+    const valid = applyWkt(pasted);
+    if (valid) {
+      // Delay to let layers render before fitting bounds
+      requestAnimationFrame(() => {
+        mapRef.current?.centerOnLayers();
+      });
+    }
+  }, [applyWkt]);
+
+  const handleCenter = useCallback(() => {
+    mapRef.current?.centerOnLayers();
   }, []);
 
   return (
@@ -67,6 +92,7 @@ function App() {
       {/* Map panel - left side */}
       <div className="flex-1 min-w-0">
         <MapPanel
+          ref={mapRef}
           onLayersChange={handleMapChange}
           externalLayers={isMapUpdateRef.current ? null : externalLayers}
         />
@@ -80,6 +106,8 @@ function App() {
         <WktEditor
           value={wkt}
           onChange={handleTextChange}
+          onPaste={handlePaste}
+          onCenter={handleCenter}
           error={error}
         />
       </div>
