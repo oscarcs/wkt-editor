@@ -87,7 +87,7 @@ export default function WktEditor({ value, onChange, onPaste, onCenter, error, r
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-sm font-semibold text-gray-700 tracking-wide uppercase">WKT Output</h2>
+        <h1 className="text-sm font-semibold text-gray-700 tracking-wide uppercase">WKT Editor</h1>
         <div className="flex gap-2">
           <button
             onClick={onCenter}
@@ -124,6 +124,7 @@ export default function WktEditor({ value, onChange, onPaste, onCenter, error, r
           </button>
         </div>
       </div>
+      <p className="px-4 py-1.5 text-xs text-gray-400 border-b border-gray-100">Draw shapes to generate WKT, or paste WKT to visualize it.</p>
       <div className="relative flex-1 min-h-0">
         {/* Mirror div renders colored text */}
         <div
