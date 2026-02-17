@@ -7,3 +7,19 @@ html, body, #root {
   margin: 0;
   padding: 0;
 }
+
+/* Edit mode vertex handles — semitransparent circles */
+.leaflet-editing-icon {
+  width: 12px !important;
+  height: 12px !important;
+  margin-left: -6px !important;
+  margin-top: -6px !important;
+  border-radius: 50% !important;
+  background: rgba(59, 130, 246, 0.4) !important;
+  border: 2px solid rgba(59, 130, 246, 0.8) !important;
+}
+
+/* Remove dashing from shapes in edit mode */
+.leaflet-pane svg path[stroke-dasharray] {
+  stroke-dasharray: none !important;
+}

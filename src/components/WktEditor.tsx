@@ -19,6 +19,19 @@ export default function WktEditor({ value, onChange, error }: WktEditorProps) {
             Copy
           </button>
           <button
+            onClick={() => {
+              if (!value.trim()) return;
+              const quantized = value.replace(/-?\d+\.?\d*/g, (m) => {
+                const n = parseFloat(m);
+                return isNaN(n) ? m : (Math.round(n * 100) / 100).toString();
+              });
+              onChange(quantized);
+            }}
+            className="text-xs px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors cursor-pointer"
+          >
+            Quantize
+          </button>
+          <button
             onClick={() => onChange('')}
             className="text-xs px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors cursor-pointer"
           >

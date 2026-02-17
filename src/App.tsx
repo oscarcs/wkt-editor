@@ -1,21 +1,39 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import L from 'leaflet';
 import MapPanel from './components/MapPanel';
 import WktEditor from './components/WktEditor';
 import { parseMultiWkt } from './lib/wkt';
 
+const STORAGE_KEY = 'wkt-editor-geometry';
+
+function loadSavedWkt(): { wkt: string; layers: L.Layer[] | null } {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return { wkt: '', layers: null };
+  try {
+    const layers = parseMultiWkt(saved);
+    return { wkt: saved, layers: layers.length > 0 ? layers : null };
+  } catch {
+    return { wkt: saved, layers: null };
+  }
+}
+
 function App() {
-  const [wkt, setWkt] = useState('');
+  const initial = useRef(loadSavedWkt());
+  const [wkt, setWkt] = useState(initial.current.wkt);
   const [error, setError] = useState<string | null>(null);
-  const [externalLayers, setExternalLayers] = useState<L.Layer[] | null>(null);
+  const [externalLayers, setExternalLayers] = useState<L.Layer[] | null>(initial.current.layers);
   const isMapUpdateRef = useRef(false);
+
+  // Persist WKT to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, wkt);
+  }, [wkt]);
 
   // Called when map layers change (draw/edit/delete)
   const handleMapChange = useCallback((newWkt: string) => {
     isMapUpdateRef.current = true;
     setWkt(newWkt);
     setError(null);
-    // Reset after the state update propagates
     requestAnimationFrame(() => {
       isMapUpdateRef.current = false;
     });

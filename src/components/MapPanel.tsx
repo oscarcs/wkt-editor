@@ -44,21 +44,99 @@ export default function MapPanel({ onLayersChange, externalLayers }: MapPanelPro
       zoomControl: true,
     });
 
-    // Blank/minimal canvas - light gray background with grid
-    const blankLayer = L.tileLayer('', { attribution: '' });
-    blankLayer.addTo(map);
+    // Graph paper grid background — draws 1-degree grid lines
+    const GraphPaperLayer = L.GridLayer.extend({
+      createTile(coords: L.Coords) {
+        const tile = document.createElement('canvas');
+        const size = this.getTileSize();
+        tile.width = size.x;
+        tile.height = size.y;
+        const ctx = tile.getContext('2d')!;
 
-    // Set a light background via CSS on the map container
-    mapContainerRef.current.style.backgroundColor = '#f0f0f0';
+        // White background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size.x, size.y);
+
+        const zoom = coords.z;
+        // Pixels per degree at this zoom level (256px per tile at zoom 0 = 360 degrees)
+        const pixelsPerDeg = (256 * Math.pow(2, zoom)) / 360;
+
+        // Tile origin in pixels
+        const tileOriginX = coords.x * size.x;
+        const tileOriginY = coords.y * size.y;
+
+        // Determine grid spacing: start at 1 degree, subdivide as we zoom in
+        let gridDeg = 1;
+        if (zoom >= 10) gridDeg = 0.01;
+        else if (zoom >= 7) gridDeg = 0.1;
+        else if (zoom >= 4) gridDeg = 1;
+        else gridDeg = 10;
+
+        const gridPixels = pixelsPerDeg * gridDeg;
+
+        // Only draw if grid lines are at least 8px apart
+        if (gridPixels < 8) return tile;
+
+        // Minor grid lines
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+
+        // Vertical lines (longitude)
+        const startX = Math.floor(tileOriginX / gridPixels) * gridPixels;
+        for (let px = startX; px <= tileOriginX + size.x; px += gridPixels) {
+          const x = px - tileOriginX;
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, size.y);
+        }
+
+        // Horizontal lines (latitude)
+        const startY = Math.floor(tileOriginY / gridPixels) * gridPixels;
+        for (let py = startY; py <= tileOriginY + size.y; py += gridPixels) {
+          const y = py - tileOriginY;
+          ctx.moveTo(0, y);
+          ctx.lineTo(size.x, y);
+        }
+        ctx.stroke();
+
+        // Major grid lines (every 10x the minor spacing)
+        const majorGridPixels = gridPixels * 10;
+        if (majorGridPixels >= 20) {
+          ctx.strokeStyle = '#c0c0c0';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+
+          const majorStartX = Math.floor(tileOriginX / majorGridPixels) * majorGridPixels;
+          for (let px = majorStartX; px <= tileOriginX + size.x; px += majorGridPixels) {
+            const x = px - tileOriginX;
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, size.y);
+          }
+
+          const majorStartY = Math.floor(tileOriginY / majorGridPixels) * majorGridPixels;
+          for (let py = majorStartY; py <= tileOriginY + size.y; py += majorGridPixels) {
+            const y = py - tileOriginY;
+            ctx.moveTo(0, y);
+            ctx.lineTo(size.x, y);
+          }
+          ctx.stroke();
+        }
+
+        return tile;
+      },
+    });
+
+    new (GraphPaperLayer as any)({ attribution: '' }).addTo(map);
 
     const drawnItems = drawnItemsRef.current;
     map.addLayer(drawnItems);
 
+    const drawControlRef = { current: null as any };
     const drawControl = new L.Control.Draw({
       position: 'topleft',
       draw: {
-        polyline: { shapeOptions: { color: '#3b82f6', weight: 3 } },
-        polygon: { shapeOptions: { color: '#3b82f6', fillColor: '#3b82f680', weight: 3 } },
+        polyline: { shapeOptions: { color: '#3b82f6', weight: 3 }, showLength: false },
+        polygon: { shapeOptions: { color: '#3b82f6', fillColor: '#3b82f680', weight: 3 }, showArea: false, showLength: false },
         rectangle: false,
         circle: false,
         circlemarker: false,
@@ -69,6 +147,39 @@ export default function MapPanel({ onLayersChange, externalLayers }: MapPanelPro
       },
     });
     map.addControl(drawControl);
+    drawControlRef.current = drawControl;
+
+    // Enter key finishes the current draw/edit action
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return;
+      // If the WKT textarea is focused, don't intercept
+      if ((e.target as HTMLElement)?.tagName === 'TEXTAREA') return;
+
+      const ctrl = drawControlRef.current;
+      if (!ctrl) return;
+
+      // Check draw toolbars for active drawing handler
+      const drawToolbar = (ctrl as any)._toolbars?.draw;
+      if (drawToolbar?._activeMode) {
+        const handler = drawToolbar._activeMode.handler;
+        // Polyline/Polygon have _finishShape
+        if (typeof handler._finishShape === 'function') {
+          handler._finishShape();
+          return;
+        }
+        // For other draw modes, disable completes the action
+        handler.disable();
+        return;
+      }
+
+      // Check edit toolbar — click the Save button
+      const editToolbar = (ctrl as any)._toolbars?.edit;
+      if (editToolbar?._activeMode) {
+        editToolbar._save();
+        return;
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
 
     map.on(L.Draw.Event.CREATED, (e: any) => {
       drawnItems.addLayer(e.layer);
@@ -81,6 +192,7 @@ export default function MapPanel({ onLayersChange, externalLayers }: MapPanelPro
     mapRef.current = map;
 
     return () => {
+      document.removeEventListener('keydown', onKeyDown);
       map.remove();
       mapRef.current = null;
     };
