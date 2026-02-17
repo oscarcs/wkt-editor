@@ -23,3 +23,8 @@ html, body, #root {
 .leaflet-pane svg path[stroke-dasharray] {
   stroke-dasharray: none !important;
 }
+
+/* Highlighted marker on hover */
+.marker-highlight {
+  filter: hue-rotate(160deg) saturate(2);
+}

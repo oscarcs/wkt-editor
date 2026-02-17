@@ -118,8 +118,19 @@ export function parseWkt(wkt: string): L.Layer | null {
   }
 }
 
-export function parseMultiWkt(text: string): L.Layer[] {
+export interface WktRange {
+  start: number;
+  end: number;
+}
+
+export interface ParseMultiWktResult {
+  layers: L.Layer[];
+  ranges: WktRange[];
+}
+
+export function parseMultiWkt(text: string): ParseMultiWktResult {
   const layers: L.Layer[] = [];
+  const ranges: WktRange[] = [];
   // Match each top-level WKT statement: TYPE (...) allowing multiline content
   const regex = /\b(\w+)\s*\(/g;
   let match;
@@ -138,8 +149,11 @@ export function parseMultiWkt(text: string): L.Layer[] {
     if (depth !== 0) continue; // unmatched parens, skip
     const wktStr = text.slice(start, i + 1);
     const layer = parseWkt(wktStr);
-    if (layer) layers.push(layer);
+    if (layer) {
+      layers.push(layer);
+      ranges.push({ start, end: i + 1 });
+    }
     regex.lastIndex = i + 1;
   }
-  return layers;
+  return { layers, ranges };
 }
