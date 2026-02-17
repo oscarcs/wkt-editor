@@ -42,9 +42,10 @@ export default function MapPanel({ onLayersChange, externalLayers }: MapPanelPro
       center: [0, 0],
       zoom: 3,
       zoomControl: true,
+      crs: L.CRS.Simple,
     });
 
-    // Graph paper grid background — draws 1-degree grid lines
+    // Graph paper grid background — pure pixel-based grid, tiles infinitely
     const GraphPaperLayer = L.GridLayer.extend({
       createTile(coords: L.Coords) {
         const tile = document.createElement('canvas');
@@ -58,21 +59,21 @@ export default function MapPanel({ onLayersChange, externalLayers }: MapPanelPro
         ctx.fillRect(0, 0, size.x, size.y);
 
         const zoom = coords.z;
-        // Pixels per degree at this zoom level (256px per tile at zoom 0 = 360 degrees)
-        const pixelsPerDeg = (256 * Math.pow(2, zoom)) / 360;
+        // In CRS.Simple, 1 unit = 1px at zoom 0. At zoom z, 1 unit = 2^z px.
+        const pixelsPerUnit = Math.pow(2, zoom);
 
         // Tile origin in pixels
         const tileOriginX = coords.x * size.x;
         const tileOriginY = coords.y * size.y;
 
-        // Determine grid spacing: start at 1 degree, subdivide as we zoom in
-        let gridDeg = 1;
-        if (zoom >= 10) gridDeg = 0.01;
-        else if (zoom >= 7) gridDeg = 0.1;
-        else if (zoom >= 4) gridDeg = 1;
-        else gridDeg = 10;
+        // Adaptive grid spacing in coordinate units
+        let gridUnit = 1;
+        if (zoom >= 10) gridUnit = 0.01;
+        else if (zoom >= 7) gridUnit = 0.1;
+        else if (zoom >= 4) gridUnit = 1;
+        else gridUnit = 10;
 
-        const gridPixels = pixelsPerDeg * gridDeg;
+        const gridPixels = pixelsPerUnit * gridUnit;
 
         // Only draw if grid lines are at least 8px apart
         if (gridPixels < 8) return tile;
@@ -82,7 +83,6 @@ export default function MapPanel({ onLayersChange, externalLayers }: MapPanelPro
         ctx.lineWidth = 0.5;
         ctx.beginPath();
 
-        // Vertical lines (longitude)
         const startX = Math.floor(tileOriginX / gridPixels) * gridPixels;
         for (let px = startX; px <= tileOriginX + size.x; px += gridPixels) {
           const x = px - tileOriginX;
@@ -90,7 +90,6 @@ export default function MapPanel({ onLayersChange, externalLayers }: MapPanelPro
           ctx.lineTo(x, size.y);
         }
 
-        // Horizontal lines (latitude)
         const startY = Math.floor(tileOriginY / gridPixels) * gridPixels;
         for (let py = startY; py <= tileOriginY + size.y; py += gridPixels) {
           const y = py - tileOriginY;
