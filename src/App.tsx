@@ -8,14 +8,14 @@ import type { WktRange } from './lib/wkt';
 
 const STORAGE_KEY = 'wkt-editor-geometry';
 
-function loadSavedWkt(): { wkt: string; layers: L.Layer[] | null; ranges: WktRange[] } {
+function loadSavedWkt(): { wkt: string; layers: L.Layer[] | null; ranges: WktRange[]; layerToStatement: number[] } {
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return { wkt: '', layers: null, ranges: [] };
+  if (!saved) return { wkt: '', layers: null, ranges: [], layerToStatement: [] };
   try {
-    const { layers, ranges } = parseMultiWkt(saved);
-    return { wkt: saved, layers: layers.length > 0 ? layers : null, ranges };
+    const { layers, ranges, layerToStatement } = parseMultiWkt(saved);
+    return { wkt: saved, layers: layers.length > 0 ? layers : null, ranges, layerToStatement };
   } catch {
-    return { wkt: saved, layers: null, ranges: [] };
+    return { wkt: saved, layers: null, ranges: [], layerToStatement: [] };
   }
 }
 
@@ -25,6 +25,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [externalLayers, setExternalLayers] = useState<L.Layer[] | null>(initial.current.layers);
   const [wktRanges, setWktRanges] = useState<WktRange[]>(initial.current.ranges);
+  const [layerToStatement, setLayerToStatement] = useState<number[]>(initial.current.layerToStatement);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const isMapUpdateRef = useRef(false);
   const mapRef = useRef<MapPanelHandle>(null);
@@ -39,8 +40,9 @@ function App() {
     isMapUpdateRef.current = true;
     setWkt(newWkt);
     setError(null);
-    const { ranges } = parseMultiWkt(newWkt);
+    const { ranges, layerToStatement: lts } = parseMultiWkt(newWkt);
     setWktRanges(ranges);
+    setLayerToStatement(lts);
     requestAnimationFrame(() => {
       isMapUpdateRef.current = false;
     });
@@ -54,11 +56,12 @@ function App() {
       setError(null);
       setExternalLayers([]);
       setWktRanges([]);
+      setLayerToStatement([]);
       return true;
     }
 
     try {
-      const { layers, ranges } = parseMultiWkt(newWkt);
+      const { layers, ranges, layerToStatement: lts } = parseMultiWkt(newWkt);
       if (layers.length === 0 && newWkt.trim()) {
         setError('Could not parse WKT. Supported: POINT, MULTIPOINT, LINESTRING, MULTILINESTRING, POLYGON, MULTIPOLYGON, GEOMETRYCOLLECTION');
         return false;
@@ -67,6 +70,7 @@ function App() {
       }
       setExternalLayers(layers);
       setWktRanges(ranges);
+      setLayerToStatement(lts);
       return layers.length > 0;
     } catch (e) {
       setError(`Parse error: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -103,6 +107,7 @@ function App() {
           onLayersChange={handleMapChange}
           externalLayers={isMapUpdateRef.current ? null : externalLayers}
           hoveredIndex={hoveredIndex}
+          layerToStatement={layerToStatement}
         />
       </div>
 

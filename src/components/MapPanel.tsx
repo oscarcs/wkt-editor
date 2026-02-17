@@ -25,13 +25,14 @@ interface MapPanelProps {
   onLayersChange: (wkt: string) => void;
   externalLayers: L.Layer[] | null;
   hoveredIndex: number | null;
+  layerToStatement: number[];
 }
 
 export interface MapPanelHandle {
   centerOnLayers: () => void;
 }
 
-export default forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ onLayersChange, externalLayers, hoveredIndex }, ref) {
+export default forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ onLayersChange, externalLayers, hoveredIndex, layerToStatement }, ref) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const drawnItemsRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
@@ -238,21 +239,22 @@ export default forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ onL
     });
   }, [externalLayers]);
 
-  // Highlight hovered layer
+  // Highlight hovered layer(s) — hoveredIndex is a statement index
   useEffect(() => {
     const drawnItems = drawnItemsRef.current;
     const layers: L.Layer[] = [];
     drawnItems.eachLayer(l => layers.push(l));
 
     layers.forEach((layer, i) => {
-      const isHovered = hoveredIndex === i;
+      const stmtIndex = layerToStatement[i];
+      const isHovered = hoveredIndex !== null && stmtIndex === hoveredIndex;
       if (layer instanceof L.Marker) {
         layer.setIcon(isHovered ? highlightIcon : defaultIcon);
       } else if (layer instanceof L.Path) {
         layer.setStyle(isHovered ? highlightStyle : defaultStyle);
       }
     });
-  }, [hoveredIndex]);
+  }, [hoveredIndex, layerToStatement]);
 
   return (
     <div ref={mapContainerRef} className="h-full w-full" />
